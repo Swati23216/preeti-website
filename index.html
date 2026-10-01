@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Preeti Janawade — Bridal &amp; Party Makeup Artist | Bengaluru</title>
@@ -40,7 +42,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500;1,600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
 </head>
 <body>
 
@@ -522,9 +524,9 @@
           <div><div class="lbl">Instagram</div><div class="val">@makeupartist_preeti_janawade</div></div>
         </a>
         <!-- ⬇ Add Preeti's real email here once confirmed, e.g. hello@preetijanawade.com -->
-        <a class="contact-line" href="mailto:hello@preetijanawade.com">
+        <a class="contact-line" href="mailto:janawadesakshi@gmail.com">
           <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></span>
-          <div><div class="lbl">Email</div><div class="val">hello@preetijanawade.com</div></div>
+          <div><div class="lbl">Email</div><div class="val">janawadesakshi@gmail.com</div></div>
         </a>
       </div>
     </div>
@@ -539,6 +541,7 @@
     </div>
     <h3>Opening WhatsApp…</h3>
     <p>Your booking details are ready to send. Complete the message in WhatsApp and Preeti will confirm shortly.</p>
+    <p id="bookingReference" hidden></p>
     <button class="btn btn-gold btn-ripple" id="popupClose">Done</button>
   </div>
 </div>
@@ -548,39 +551,126 @@
   <div class="wrap">
     <div class="section-head reveal">
       <span class="eyebrow">After Your Service</span>
-      <h2>Pay Preeti via UPI</h2>
-      <p style="color:rgba(255,251,246,0.6);">Payment is collected only after the service is completed — enter the agreed amount and pay directly to Preeti's UPI-linked number.</p>
+      <h2>Pay Securely with Razorpay</h2>
+      <p style="color:rgba(255,251,246,0.6);">Pay after your service is complete using your booking reference. Preeti will set the final amount before payment.</p>
     </div>
 
     <div class="pay-card reveal">
       <div class="pay-left">
         <div class="form-field">
-          <label for="payAmount">Amount to Pay (₹)</label>
-          <input type="number" id="payAmount" min="1" placeholder="e.g. 5000">
-          <div class="pay-amount-display" id="payAmountDisplay">₹0</div>
+          <label for="paymentBookingId">Booking Reference for Razorpay</label>
+          <input type="number" id="paymentBookingId" min="1" step="1" inputmode="numeric" placeholder="Enter your booking reference">
         </div>
-        <a href="#" id="upiPayBtn" class="btn btn-gold btn-ripple">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
-          Pay Now via UPI App
-        </a>
-        <div class="pay-apps">
-          <span class="pay-app-chip">PhonePe</span>
-          <span class="pay-app-chip">Google Pay</span>
-          <span class="pay-app-chip">Paytm</span>
-        </div>
+        <button type="button" id="razorpayPayBtn" class="btn btn-gold btn-ripple">
+          Pay Securely with Razorpay
+        </button>
+        <p id="razorpayPaymentMessage" class="pay-note" role="status" aria-live="polite"></p>
         <p class="pay-note">
-          Tapping "Pay Now" opens PhonePe, Google Pay, or any UPI app on a phone with the amount pre-filled. On a laptop or desktop, scan the QR code with any UPI app instead.<br><br>
-          <strong>Note for Preeti:</strong> this button currently points to the UPI ID <code>9019672643@ybl</code> — the standard format for PhonePe numbers. Please confirm your exact UPI ID inside the PhonePe app (Profile → UPI ID) and update it in the site's code if it's different, so payments reach the right account.
+          The payable amount is loaded securely from your completed booking. Payments are processed through Razorpay Checkout.
         </p>
-      </div>
-      <div class="qr-box">
-        <div id="qrcode"></div>
-        <div class="qr-caption">Scan to Pay</div>
-        <div class="upi-id-display">9019672643@ybl</div>
       </div>
     </div>
   </div>
 </section>
+
+<!-- ============ FAQ ============ -->
+<section class="faq-section" id="faq">
+  <div class="wrap">
+
+    <div class="faq-heading reveal">
+      <span class="eyebrow">FAQ</span>
+
+      <h2>Frequently Asked Questions</h2>
+
+      <p>
+        Everything you need to know about our makeup services.
+      </p>
+    </div>
+
+    <div class="faq-list">
+
+      <div class="faq-item">
+        <button class="faq-q" type="button">
+          How can I book a makeup appointment?
+          <span>+</span>
+        </button>
+
+        <div class="faq-a">
+          <p>
+            You can book an appointment using the booking form
+            on our website. Enter your details, select your
+            service and preferred date, and submit your booking.
+          </p>
+        </div>
+      </div>
+
+
+      <div class="faq-item">
+        <button class="faq-q" type="button">
+          What makeup services do you offer?
+          <span>+</span>
+        </button>
+
+        <div class="faq-a">
+          <p>
+            We offer bridal makeup, party makeup and other
+            makeup services based on your requirements.
+          </p>
+        </div>
+      </div>
+
+
+      <div class="faq-item">
+        <button class="faq-q" type="button">
+          How early should I book bridal makeup?
+          <span>+</span>
+        </button>
+
+        <div class="faq-a">
+          <p>
+            Bridal appointments are recommended to be booked
+            as early as possible, especially during the wedding
+            season.
+          </p>
+        </div>
+      </div>
+
+
+      <div class="faq-item">
+        <button class="faq-q" type="button">
+          Where are you located?
+          <span>+</span>
+        </button>
+
+        <div class="faq-a">
+          <p>
+            We are located in Benadi, Taluka Nipani,
+            District Belagavi, Karnataka.
+          </p>
+        </div>
+      </div>
+
+
+      <div class="faq-item">
+        <button class="faq-q" type="button">
+          How can I contact you?
+          <span>+</span>
+        </button>
+
+        <div class="faq-a">
+          <p>
+            You can contact us through WhatsApp or use the
+            booking form on the website.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>
+
+
 
 
 
@@ -608,7 +698,7 @@
       <!-- ⬇ Replace the embed src with Preeti's exact studio/service-area location once confirmed -->
       <iframe
         title="Service area map"
-        src="https://www.google.com/maps?q=Bengaluru,Karnataka&output=embed"
+        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d61204.32307908239!2d74.3511235416815!3d16.512451563479647!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc0faa5833c5bdd%3A0x587a2127b246ab2a!2sBenadi%2C%20Karnataka!5e0!3m2!1sen!2sin!4v1787563973554!5m2!1sen!2sin" width="600" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="strict-origin-when-cross-origin">
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade">
       </iframe>
@@ -683,3 +773,70 @@
 
 </body>
 </html>
+
+<!-- ============ FOLLOW-UP ============ -->
+<section id="followup-section" class="followup-section">
+    <div class="wrap">
+
+        <div class="section-head">
+            <span class="eyebrow">Stay Connected</span>
+            <h2>Schedule Follow-Up</h2>
+            <p>
+                Keep track of your client follow-ups and never miss an appointment.
+            </p>
+        </div>
+
+        <div class="followup-card">
+
+            <form id="followupForm">
+
+                <div class="form-field">
+                    <label for="followupBooking">Select Booking</label>
+                    <select id="followupBooking" required>
+                        <option value="">Select Booking</option>
+                    </select>
+                </div>
+
+                <div class="form-row-2">
+
+                    <div class="form-field">
+                        <label for="followupDate">Follow-Up Date</label>
+                        <input
+                            type="date"
+                            id="followupDate"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-field">
+                        <label for="followupTime">Follow-Up Time</label>
+                        <input
+                            type="time"
+                            id="followupTime"
+                            required
+                        >
+                    </div>
+
+                </div>
+
+                <div class="form-field">
+                    <label for="followupRemarks">Remarks</label>
+                    <textarea
+                        id="followupRemarks"
+                        rows="4"
+                        placeholder="Enter follow-up remarks"
+                    ></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-gold btn-ripple">
+                    Schedule Follow-Up
+                </button>
+
+            </form>
+
+            <div id="followupMessage"></div>
+
+        </div>
+
+    </div>
+</section>

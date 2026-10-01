@@ -10,6 +10,8 @@
   // =========================================================
   const API_URL = "http://127.0.0.1:8000";
 
+  const UPI_ID = "9019672643@ybl";
+  const PAYEE_NAME = "Preeti Janawade";
   const WHATSAPP_NUMBER = "919019672643";
 
   const reduceMotion = window.matchMedia(
@@ -955,16 +957,6 @@
             result
           );
 
-          const bookingReference = document.getElementById(
-            'bookingReference'
-          );
-
-          if (bookingReference && result && result.booking_id) {
-            bookingReference.textContent =
-              `Your booking reference is #${result.booking_id}. Keep it for your payment after the service is complete.`;
-            bookingReference.hidden = false;
-          }
-
 
           // -------------------------------------------------
           // WHATSAPP MESSAGE
@@ -1140,391 +1132,250 @@
   });
 
 
-const newsletterForm = document.getElementById("newsletterForm");
+  // =========================================================
+  // NEWSLETTER
+  // =========================================================
+  const newsletterForm = document.getElementById(
+    'newsletterForm'
+  );
 
-if (newsletterForm) {
-    newsletterForm.addEventListener("submit", async function (e) {
+  if (newsletterForm) {
+
+    newsletterForm.addEventListener(
+      'submit',
+      function (e) {
+
         e.preventDefault();
 
-        const btn = newsletterForm.querySelector("button");
-        const input = newsletterForm.querySelector("#nlEmail");
+        const btn = newsletterForm.querySelector(
+          'button'
+        );
 
-        if (!btn || !input) return;
-
-        const email = input.value.trim();
-
-        if (!email) return;
+        if (!btn) {
+          return;
+        }
 
         const original = btn.textContent;
 
-        btn.disabled = true;
-        btn.textContent = "Subscribing...";
+        btn.textContent =
+          'Subscribed ✓';
 
-        try {
-            const response = await fetch(
-                `${API_URL}/api/newsletter/subscribe`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify({
-                        email: email
-                    })
-                }
-            );
+        const input = newsletterForm.querySelector(
+          'input'
+        );
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.detail || "Subscription failed"
-                );
-            }
-
-        console.log("Newsletter response:", data);
-
-            if (data.message === "Email is already subscribed") {
-                    btn.textContent = "Already Subscribed ✓";
-               } else {
-                    btn.textContent = "Subscribed ✓";
-            }
-
-             input.value = "";
-
-        } catch (error) {
-            console.error("Newsletter error:", error);
-
-            btn.textContent = "Try Again";
+        if (input) {
+          input.value = '';
         }
 
         setTimeout(() => {
-            btn.textContent = original;
-            btn.disabled = false;
+
+          btn.textContent =
+            original;
+
         }, 2500);
-    });
-}
-//
-
-async function startPayment() {
-    const bookingIdInput = document.getElementById("paymentBookingId");
-    const message = document.getElementById("razorpayPaymentMessage");
-    const payButton = document.getElementById("razorpayPayBtn");
-
-    if (!bookingIdInput || !message || !payButton) {
-        return;
-    }
-
-    const bookingId = Number(bookingIdInput.value);
-
-    if (!Number.isSafeInteger(bookingId) || bookingId <= 0) {
-        message.textContent = "Enter a valid booking reference.";
-        return;
-    }
-
-    if (typeof window.Razorpay !== "function") {
-        message.textContent =
-            "Razorpay Checkout could not be loaded. Check your connection and try again.";
-        return;
-    }
-
-    try {
-        payButton.disabled = true;
-        message.innerText = "Creating payment order...";
-
-        const orderResponse = await fetch(
-            `${API_URL}/api/payments/create-order`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    booking_id: bookingId
-                })
-            }
-        );
-
-        const orderData = await orderResponse.json();
-
-        console.log("Create Order Response:", orderData);
-
-        if (!orderResponse.ok) {
-            throw new Error(
-                orderData.detail || "Unable to create payment order"
-            );
-        }
-
-        const options = {
-            key: orderData.razorpay_key_id,
-            amount: orderData.amount_paise,
-            currency: orderData.currency,
-            name: "Preeti's Makeup",
-            description: "Makeup Service Payment",
-            order_id: orderData.order_id,
-            notes: {
-                booking_id: String(bookingId)
-            },
-            handler: async function (response) {
-                message.textContent =
-                    "Payment received. Verifying securely...";
-                try {
-                    const verifyResponse = await fetch(
-                        `${API_URL}/api/payments/verify`,
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify({
-                                razorpay_order_id:
-                                    response.razorpay_order_id,
-                                razorpay_payment_id:
-                                    response.razorpay_payment_id,
-                                razorpay_signature:
-                                    response.razorpay_signature,
-                                booking_id: bookingId
-                            })
-                        }
-                    );
-
-                    const verifyData =
-                        await verifyResponse.json();
-
-                    if (!verifyResponse.ok) {
-                        throw new Error(
-                            verifyData.detail ||
-                            "Payment verification failed"
-                        );
-                    }
-
-                    message.textContent =
-                        `Payment successful for booking #${bookingId}.`;
-
-                } catch (error) {
-                    console.error(
-                        "Verification Error:",
-                        error
-                    );
-                    message.textContent =
-                        `Payment verification failed: ${error.message}`;
-                } finally {
-                    payButton.disabled = false;
-                }
-            },
-            modal: {
-                ondismiss: function () {
-                    message.textContent = "Payment was cancelled.";
-                    payButton.disabled = false;
-                }
-            },
-            theme: {
-                color: "#3399cc"
-            }
-        };
-
-        const razorpay = new window.Razorpay(options);
-
-        razorpay.on(
-            "payment.failed",
-            function (response) {
-                console.error(
-                    "Payment Failed:",
-                    response.error
-                );
-                message.textContent =
-                    `Payment failed: ${response.error.description}`;
-                payButton.disabled = false;
-            }
-        );
-
-        message.textContent = "Opening Razorpay Checkout...";
-        razorpay.open();
-    } catch (error) {
-        console.error(
-            "Payment Error:",
-            error
-        );
-        message.textContent = error.message;
-        payButton.disabled = false;
-    }
-}
+      }
+    );
+  }
 
 
-// Load bookings into Follow-Up dropdown
-async function loadBookingsForFollowup() {
+  // =========================================================
+  // UPI PAYMENT
+  // =========================================================
+  function buildUpiLink(
+    amount,
+    scheme = 'upi'
+  ) {
 
-    const select = document.getElementById("followupBooking");
+    const prefix = scheme === 'phonepe'
+      ? 'phonepe://pay?'
+      : 'upi://pay?';
 
-    if (!select) return;
 
-    try {
+    const params = new URLSearchParams({
+      pa: UPI_ID,
 
-        const response = await fetch(
-            `${API_URL}/api/bookings`
-        );
+      pn: PAYEE_NAME,
 
-        if (!response.ok) {
-            throw new Error("Failed to load bookings");
-        }
+      cu: 'INR',
 
-        const data = await response.json();
-
-        select.innerHTML =
-            '<option value="">Select Booking</option>';
-
-        data.bookings.forEach(booking => {
-
-            const option = document.createElement("option");
-
-            option.value = booking.booking_id;
-
-            option.textContent =
-                `#${booking.booking_id} - ${booking.name} - ${booking.event_type} - ${booking.event_date}`;
-
-            select.appendChild(option);
-        });
-
-    } catch (error) {
-
-        console.error(
-            "Error loading bookings:",
-            error
-        );
-    }
-}
-
-document
-    .getElementById("followupForm")
-    ?.addEventListener("submit", async function (event) {
-
-        event.preventDefault();
-
-        const bookingId =
-            document.getElementById("followupBooking").value;
-
-        const followupDate =
-            document.getElementById("followupDate").value;
-
-        const followupTime =
-            document.getElementById("followupTime").value;
-
-        const remarks =
-            document.getElementById("followupRemarks").value;
-
-        if (!bookingId) {
-            alert("Please select a booking.");
-            return;
-        }
-
-        try {
-
-            const response = await fetch(
-                `${API_URL}/api/followups`,
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-
-                    body: JSON.stringify({
-                        booking_id: Number(bookingId),
-                        followup_date: followupDate,
-                        followup_time: followupTime,
-                        remarks: remarks,
-                        status: "Pending"
-                    })
-                }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.detail || "Failed to create follow-up"
-                );
-            }
-
-            console.log(
-                "Follow-up created:",
-                data
-            );
-
-            document.getElementById(
-                "followupMessage"
-            ).textContent =
-                "Follow-up scheduled successfully!";
-
-            document.getElementById(
-                "followupForm"
-            ).reset();
-
-            loadFollowups();
-
-        } catch (error) {
-
-            console.error(
-                "Follow-up error:",
-                error
-            );
-
-            document.getElementById(
-                "followupMessage"
-            ).textContent =
-                error.message;
-        }
+      tn: 'Makeup Service Payment'
     });
 
-    async function loadFollowups() {
 
-    try {
+    if (amount &&
+      Number(amount) > 0) {
 
-        const response = await fetch(
-            `${API_URL}/api/followups`
-        );
-
-        if (!response.ok) {
-            throw new Error("Failed to load follow-ups");
-        }
-
-        const data = await response.json();
-
-        console.log(
-            "Follow-ups:",
-            data.followups
-        );
-
-        // We'll display these in a table next.
-
-    } catch (error) {
-
-        console.error(
-            "Error loading follow-ups:",
-            error
-        );
+      params.set(
+        'am',
+        amount
+      );
     }
-}
 
-document.addEventListener(
-    "DOMContentLoaded",
+
+    return (
+      `${prefix}${params.toString()}`
+    );
+  }
+
+
+  function launchUpiPayment(amount) {
+
+    const phonepeLink = buildUpiLink(
+      amount,
+      'phonepe'
+    );
+
+    const upiLink = buildUpiLink(
+      amount,
+      'upi'
+    );
+
+
+    window.location.href =
+      phonepeLink;
+
+
+    setTimeout(() => {
+
+      window.location.href =
+        upiLink;
+
+    }, 1200);
+  }
+
+
+  function renderQr(amount) {
+
+    const box = document.getElementById(
+      'qrcode'
+    );
+
+    if (!box ||
+      typeof QRCode === 'undefined') {
+      return;
+    }
+
+
+    box.innerHTML = '';
+
+
+    new QRCode(box, {
+      text: buildUpiLink(amount),
+
+      width: 180,
+
+      height: 180,
+
+      colorDark: '#2E0716',
+
+      colorLight: '#FFFBF6'
+    });
+  }
+
+
+  const amountInput = document.getElementById(
+    'payAmount'
+  );
+
+  const upiBtn = document.getElementById(
+    'upiPayBtn'
+  );
+
+  const amountDisplay = document.getElementById(
+    'payAmountDisplay'
+  );
+
+
+  function refreshPayLink() {
+
+    if (!amountInput || !upiBtn) {
+      return;
+    }
+
+
+    const amt = amountInput.value;
+
+
+    upiBtn.setAttribute(
+      'href',
+      buildUpiLink(amt)
+    );
+
+
+    renderQr(amt);
+
+
+    if (amountDisplay) {
+
+      amountDisplay.textContent =
+        '₹' +
+        (
+          amt
+            ? Number(amt)
+              .toLocaleString('en-IN')
+            : '0'
+        );
+
+
+      amountDisplay.classList.add(
+        'bump'
+      );
+
+
+      setTimeout(() => {
+
+        amountDisplay.classList.remove(
+          'bump'
+        );
+
+      }, 200);
+    }
+  }
+
+
+  if (amountInput) {
+
+    amountInput.addEventListener(
+      'input',
+      refreshPayLink
+    );
+  }
+
+
+  if (upiBtn && amountInput) {
+
+    upiBtn.addEventListener(
+      'click',
+      function (e) {
+
+        e.preventDefault();
+
+        launchUpiPayment(
+          amountInput.value
+        );
+      }
+    );
+  }
+
+
+  window.addEventListener(
+    'load',
     () => {
-
-        loadBookingsForFollowup();
-
-        loadFollowups();
-
+      refreshPayLink();
     }
-);
-
-document
-    .getElementById("razorpayPayBtn")
-    ?.addEventListener("click", startPayment);
+  );
 
 
+  // =========================================================
+  // FOOTER YEAR
+  // =========================================================
+  const yearEl = document.getElementById('year');
 
-// ============================================================
-// END OF SCRIPT
-// ============================================================
+  if (yearEl) {
+
+    yearEl.textContent =
+      new Date().getFullYear();
+  }
 
 })();

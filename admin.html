@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Preeti's Admin Dashboard</title>
+
+    <link rel="stylesheet" href="admin.css">
+
+    <link rel="icon" href="data:,">
+
+</head>
+<body>
+
+    <!-- ============================= -->
+    <!-- SIDEBAR -->
+    <!-- ============================= -->
+
+    <aside class="sidebar">
+
+        <h2>Preeti's Admin</h2>
+
+        <nav>
+
+            <button onclick="showSection('dashboard')">
+                Dashboard
+            </button>
+
+            <button onclick="showSection('bookings')">
+                Bookings
+            </button>
+
+            <button onclick="showSection('followups')">
+                Follow Ups
+            </button>
+
+            <button onclick="showSection('transactions')">
+                Transactions
+            </button>
+
+            <button onclick="showSection('payments')">
+                Payments
+            </button>
+
+            <button onclick="showSection('subscribers')">
+                Newsletter Subscribers
+            </button>
+
+        </nav>
+
+    </aside>
+
+
+    <!-- ============================= -->
+    <!-- MAIN CONTENT -->
+    <!-- ============================= -->
+
+    <main class="main-content">
+
+        <header>
+
+            <h1>Admin Dashboard</h1>
+
+            <button onclick="loadDashboard()">
+                🔄 Refresh
+            </button>
+
+        </header>
+
+
+        <!-- ============================= -->
+        <!-- DASHBOARD -->
+        <!-- ============================= -->
+
+        <section id="dashboard" class="section">
+
+            <h2>Dashboard Overview</h2>
+
+            <div class="cards">
+
+                <div class="card">
+                    <h3>Total Bookings</h3>
+                    <p id="totalBookings">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Pending</h3>
+                    <p id="pendingBookings">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Confirmed</h3>
+                    <p id="confirmedBookings">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Completed</h3>
+                    <p id="completedBookings">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Cancelled</h3>
+                    <p id="cancelledBookings">0</p>
+                </div>
+
+                <div class="card">
+                    <h3>Paid</h3>
+                    <p id="paidBookings">0</p>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ============================= -->
+        <!-- BOOKINGS -->
+        <!-- ============================= -->
+
+        
+
+<section id="bookings" class="section hidden">
+
+    <div class="section-header">
+
+        <div>
+            <h2>Bookings</h2>
+            <p>Manage all customer bookings</p>
+        </div>
+
+        <div class="booking-controls">
+
+            <label for="bookingStatusFilter">
+                Status:
+            </label>
+
+            <select id="bookingStatusFilter"
+                    onchange="loadBookings()">
+
+                <option value="">All</option>
+                <option value="Pending">Pending</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+
+            </select>
+
+            <button onclick="loadBookings()"
+                    class="refresh-btn">
+                🔄 Refresh
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <div class="table-container">
+
+        <table class="bookings-table">
+
+            <thead>
+
+                <tr>
+
+                    <th>ID</th>
+
+                    <th>Customer</th>
+
+                    <th>Date</th>
+
+                    <th>Time</th>
+
+                    <th>Status</th>
+
+                    <th>Amount</th>
+
+                    <th>Payment</th>
+
+                    <th>Actions</th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody id="bookingsTableBody">
+
+                <tr>
+
+                    <td colspan="8" class="loading">
+                        Loading bookings...
+                    </td>
+
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
+
+        <!-- ============================= -->
+        <!-- FOLLOW UPS -->
+        <!-- ============================= -->
+
+        <section id="followups" class="section hidden">
+
+            <h2>Follow Ups</h2>
+
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>ID</th>
+
+                            <th>Booking ID</th>
+
+                            <th>Status</th>
+
+                            <th>Date</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="followupsTable">
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+        
+<!-- ============================= -->
+<!-- NEWSLETTER SUBSCRIBERS -->
+<!-- ============================= -->
+
+        <section id="subscribers" class="section hidden">
+
+            <h2>Newsletter Subscribers</h2>
+
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                        <th>ID</th>
+                        <th>Email</th>
+                        <th>Subscribed At</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="subscribersTable">
+                    </tbody>
+
+                </table>
+
+             </div>
+
+        </section>
+        
+
+
+        <!-- ============================= -->
+        <!-- TRANSACTIONS -->
+        <!-- ============================= -->
+
+        <section id="transactions" class="section hidden">
+
+            <h2>Transactions</h2>
+
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Booking ID</th>
+
+                            <th>Amount</th>
+
+                            <th>Status</th>
+
+                            <th>Payment ID</th>
+
+                            <th>Date</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="transactionsTable">
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- ============================= -->
+        <!-- PAYMENTS -->
+        <!-- ============================= -->
+
+        <section id="payments" class="section hidden">
+
+            <h2>Payments</h2>
+
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>Booking ID</th>
+
+                            <th>Amount</th>
+
+                            <th>Status</th>
+
+                            <th>Payment ID</th>
+
+                            <th>Order ID</th>
+
+                        </tr>
+
+                    </thead>
+
+                    <tbody id="paymentsTable">
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <script src="admin.js"></script>
+
+</body>
+
+</html>
