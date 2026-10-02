@@ -8,7 +8,7 @@
   // =========================================================
   // CONFIG
   // =========================================================
-  const API_URL = "http://127.0.0.1:8000";
+  const API_URL = "https://preeti-website-1.onrender.com";
 
   const UPI_ID = "9019672643@ybl";
   const PAYEE_NAME = "Preeti Janawade";
