@@ -59,6 +59,7 @@ body {
     margin-left: 230px;
     padding: 30px;
     width: calc(100% - 230px);
+    min-width: 0;
 }
 
 header {
@@ -105,6 +106,11 @@ header button {
     font-weight: bold;
 }
 
+#dashboardError {
+    margin-top: 16px;
+    color: #b42318;
+}
+
 
 /* ============================= */
 /* TABLE */
@@ -115,6 +121,7 @@ header button {
     background: white;
     overflow-x: auto;
     border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 table {
@@ -122,15 +129,141 @@ table {
     border-collapse: collapse;
 }
 
+.bookings-table {
+    min-width: 1120px;
+}
+
 th,
 td {
     padding: 12px;
     border-bottom: 1px solid #ddd;
     text-align: left;
+    vertical-align: middle;
 }
 
 th {
     background: #eee;
+    white-space: nowrap;
+}
+
+.bookings-table td {
+    white-space: nowrap;
+}
+
+.bookings-table td:nth-child(2),
+.bookings-table td:nth-child(4) {
+    white-space: normal;
+    min-width: 135px;
+}
+
+.section-header,
+.booking-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.section-header h2 {
+    margin-bottom: 6px;
+}
+
+.section-header p {
+    color: #666;
+}
+
+.booking-controls {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+.booking-controls select,
+.refresh-btn {
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background: #fff;
+}
+
+.refresh-btn,
+.action-btn {
+    cursor: pointer;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.action-btn {
+    min-width: 34px;
+    min-height: 34px;
+}
+
+.action-btn:disabled,
+button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.status-badge,
+.payment-badge {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: #eee;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-pending,
+.payment-unpaid {
+    color: #8a4b00;
+    background: #fff1d6;
+}
+
+.status-confirmed {
+    color: #175cd3;
+    background: #eaf2ff;
+}
+
+.status-completed,
+.payment-paid {
+    color: #067647;
+    background: #dcfae6;
+}
+
+.status-cancelled,
+.payment-not-due {
+    color: #667085;
+    background: #f2f4f7;
+}
+
+.confirm-btn,
+.complete-btn {
+    color: #067647;
+    background: #dcfae6;
+}
+
+.cancel-btn {
+    color: #b42318;
+    background: #fee4e2;
+}
+
+.view-btn {
+    color: #175cd3;
+    background: #eaf2ff;
+}
+
+.amount-btn {
+    color: #8a4b00;
+    background: #fff1d6;
+}
+
+.error-message {
+    color: #b42318;
 }
 
 
@@ -173,3 +306,67 @@ th {
     display: none;
 }
 
+@media (max-width: 900px) {
+    .sidebar {
+        width: 190px;
+    }
+
+    .main-content {
+        margin-left: 190px;
+        width: calc(100% - 190px);
+        padding: 22px;
+    }
+
+    .section-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .booking-controls {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    body {
+        display: block;
+    }
+
+    .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+    }
+
+    .sidebar h2 {
+        margin-bottom: 14px;
+    }
+
+    .sidebar nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .main-content {
+        width: 100%;
+        margin: 0;
+        padding: 18px 12px;
+    }
+
+    .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .card p {
+        font-size: 24px;
+    }
+
+    .booking-controls {
+        width: 100%;
+    }
+}

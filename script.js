@@ -9,7 +9,10 @@
   // CONFIG
   // =========================================================
   
-  const API_URL = "https://preeti-website-1.onrender.com";
+  const API_URL =
+    ["localhost", "127.0.0.1"].includes(window.location.hostname)
+      ? `${window.location.protocol}//${window.location.hostname}:8000`
+      : "https://preeti-website-1.onrender.com";
 
   const WHATSAPP_NUMBER = "919019672643";
 
@@ -1209,17 +1212,24 @@ if (newsletterForm) {
 
 async function startPayment() {
     const bookingIdInput = document.getElementById("paymentBookingId");
+    const paymentAmountInput = document.getElementById("paymentAmount");
     const message = document.getElementById("razorpayPaymentMessage");
     const payButton = document.getElementById("razorpayPayBtn");
 
-    if (!bookingIdInput || !message || !payButton) {
+    if (!bookingIdInput || !paymentAmountInput || !message || !payButton) {
         return;
     }
 
     const bookingId = Number(bookingIdInput.value);
+    const paymentAmount = Number(paymentAmountInput.value);
 
     if (!Number.isSafeInteger(bookingId) || bookingId <= 0) {
         message.textContent = "Enter a valid booking reference.";
+        return;
+    }
+
+    if (!Number.isFinite(paymentAmount) || paymentAmount < 1) {
+        message.textContent = "Enter a payment amount of at least ₹1.";
         return;
     }
 
@@ -1241,7 +1251,8 @@ async function startPayment() {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    booking_id: bookingId
+                    booking_id: bookingId,
+                    amount: paymentAmount
                 })
             }
         );
@@ -1256,12 +1267,14 @@ async function startPayment() {
             );
         }
 
+        const chargedAmount = Number(orderData.amount);
+
         const options = {
             key: orderData.razorpay_key_id,
             amount: orderData.amount_paise,
             currency: orderData.currency,
             name: "Preeti's Makeup",
-            description: "Makeup Service Payment",
+            description: `Payment for booking #${bookingId}`,
             order_id: orderData.order_id,
             notes: {
                 booking_id: String(bookingId)
@@ -1299,8 +1312,13 @@ async function startPayment() {
                         );
                     }
 
-                    message.textContent =
-                        `Payment successful for booking #${bookingId}.`;
+                    if (verifyData.payment_status === "PAID") {
+                        message.textContent =
+                            `Payment successful. Booking #${bookingId} is paid in full.`;
+                    } else {
+                        message.textContent =
+                            `Payment of ₹${chargedAmount.toFixed(2)} recorded for booking #${bookingId}. Contact Preeti to confirm any remaining balance.`;
+                    }
 
                 } catch (error) {
                     console.error(
@@ -1346,6 +1364,133 @@ async function startPayment() {
             "Payment Error:",
             error
         );
+        message.textContent = error.message;
+        payButton.disabled = false;
+    }
+}
+
+async function startStandalonePayment() {
+    const nameInput = document.getElementById("standalonePayerName");
+    const amountInput = document.getElementById("standalonePaymentAmount");
+    const message = document.getElementById("standalonePaymentMessage");
+    const payButton = document.getElementById("standaloneRazorpayPayBtn");
+
+    if (!nameInput || !amountInput || !message || !payButton) {
+        return;
+    }
+
+    const customerName = nameInput.value.trim();
+    const amount = Number(amountInput.value);
+
+    if (customerName.length < 2) {
+        message.textContent = "Enter your name.";
+        return;
+    }
+
+    if (!Number.isFinite(amount) || amount < 1) {
+        message.textContent = "Enter a payment amount of at least ₹1.";
+        return;
+    }
+
+    if (typeof window.Razorpay !== "function") {
+        message.textContent =
+            "Razorpay Checkout could not be loaded. Check your connection and try again.";
+        return;
+    }
+
+    try {
+        payButton.disabled = true;
+        message.textContent = "Creating payment order...";
+
+        const orderResponse = await fetch(
+            `${API_URL}/api/payments/create-standalone-order`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    customer_name: customerName,
+                    amount
+                })
+            }
+        );
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok) {
+            throw new Error(
+                orderData.detail || "Unable to create payment order"
+            );
+        }
+
+        const options = {
+            key: orderData.razorpay_key_id,
+            amount: orderData.amount_paise,
+            currency: orderData.currency,
+            name: "Preeti's Makeup",
+            description: "Customer payment",
+            order_id: orderData.order_id,
+            prefill: {
+                name: customerName
+            },
+            handler: async function (response) {
+                message.textContent = "Verifying payment securely...";
+
+                try {
+                    const verifyResponse = await fetch(
+                        `${API_URL}/api/payments/verify-standalone`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature
+                            })
+                        }
+                    );
+                    const verifyData = await verifyResponse.json();
+
+                    if (!verifyResponse.ok) {
+                        throw new Error(
+                            verifyData.detail || "Payment verification failed"
+                        );
+                    }
+
+                    message.textContent =
+                        `Payment of ₹${Number(orderData.amount).toFixed(2)} verified for ${customerName}.`;
+                } catch (error) {
+                    console.error("Standalone payment verification error:", error);
+                    message.textContent =
+                        `Payment verification failed: ${error.message}`;
+                } finally {
+                    payButton.disabled = false;
+                }
+            },
+            modal: {
+                ondismiss: function () {
+                    message.textContent = "Payment was cancelled.";
+                    payButton.disabled = false;
+                }
+            },
+            theme: {
+                color: "#3399cc"
+            }
+        };
+
+        const razorpay = new window.Razorpay(options);
+        razorpay.on("payment.failed", function (response) {
+            console.error("Standalone payment failed:", response.error);
+            message.textContent =
+                `Payment failed: ${response.error.description}`;
+            payButton.disabled = false;
+        });
+        message.textContent = "Opening Razorpay Checkout...";
+        razorpay.open();
+    } catch (error) {
+        console.error("Standalone payment error:", error);
         message.textContent = error.message;
         payButton.disabled = false;
     }
@@ -1521,6 +1666,10 @@ document.addEventListener(
 document
     .getElementById("razorpayPayBtn")
     ?.addEventListener("click", startPayment);
+
+document
+    .getElementById("standaloneRazorpayPayBtn")
+    ?.addEventListener("click", startStandalonePayment);
 
 
 

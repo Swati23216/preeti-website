@@ -3,7 +3,52 @@
 // =====================================================
 
 
-const API_URL = "https://preeti-website-1.onrender.com";
+const API_URL =
+    ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
+    window.location.port === "5500"
+        ? "http://127.0.0.1:8000"
+        : window.location.origin;
+
+let adminAuthorization = "";
+
+async function adminFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+
+    if (adminAuthorization) {
+        headers.set("Authorization", `Basic ${adminAuthorization}`);
+    }
+
+    let response = await fetch(url, { ...options, headers });
+
+    if (response.status !== 401) {
+        return response;
+    }
+
+    const username = window.prompt("Admin username:");
+    if (username === null) {
+        throw new Error("Admin login was cancelled.");
+    }
+
+    const password = window.prompt("Admin password:");
+    if (password === null) {
+        throw new Error("Admin login was cancelled.");
+    }
+
+    const credentials = new TextEncoder().encode(`${username}:${password}`);
+    adminAuthorization = btoa(
+        Array.from(credentials, byte => String.fromCharCode(byte)).join("")
+    );
+    headers.set("Authorization", `Basic ${adminAuthorization}`);
+
+    response = await fetch(url, { ...options, headers });
+
+    if (response.status === 401) {
+        adminAuthorization = "";
+        throw new Error("Admin login failed. Refresh the page and try again.");
+    }
+
+    return response;
+}
 
 // =====================================================
 // SHOW SECTION
@@ -82,7 +127,7 @@ async function loadDashboard() {
 
     try {
 
-        const response = await fetch(
+        const response = await adminFetch(
             `${API_URL}/api/bookings`
         );
 
@@ -92,13 +137,14 @@ async function loadDashboard() {
         );
 
         if (!response.ok) {
-
+            const errorData = await response.json().catch(() => ({}));
             throw new Error(
-                `HTTP ${response.status}`
+                errorData.detail || `Unable to load dashboard (HTTP ${response.status})`
             );
         }
 
         const data = await response.json();
+        setText("dashboardError", "");
 
         console.log(
             "Dashboard API response:",
@@ -326,35 +372,13 @@ async function loadDashboard() {
         );
 
 
-        setText(
-            "totalBookings",
-            0
-        );
-
-        setText(
-            "pendingBookings",
-            0
-        );
-
-        setText(
-            "confirmedBookings",
-            0
-        );
-
-        setText(
-            "completedBookings",
-            0
-        );
-
-        setText(
-            "cancelledBookings",
-            0
-        );
-
-        setText(
-            "paidBookings",
-            0
-        );
+        setText("dashboardError", error.message);
+        setText("totalBookings", "—");
+        setText("pendingBookings", "—");
+        setText("confirmedBookings", "—");
+        setText("completedBookings", "—");
+        setText("cancelledBookings", "—");
+        setText("paidBookings", "—");
 
     }
 
@@ -383,7 +407,7 @@ async function loadBookings() {
 
     tableBody.innerHTML = `
         <tr>
-            <td colspan="9" class="loading">
+            <td colspan="10" class="loading">
                 Loading bookings...
             </td>
         </tr>
@@ -392,18 +416,21 @@ async function loadBookings() {
 
     try {
 
-        const response =
-            await fetch(
-                `${API_URL}/api/bookings`
-            );
-
+        const selectedStatus = document.getElementById(
+            "bookingStatusFilter"
+        )?.value;
+        const query = selectedStatus
+            ? `?status=${encodeURIComponent(selectedStatus)}`
+            : "";
+        const response = await adminFetch(
+            `${API_URL}/api/bookings${query}`
+        );
 
         if (!response.ok) {
-
+            const errorData = await response.json().catch(() => ({}));
             throw new Error(
-                `HTTP ${response.status}`
+                errorData.detail || `Unable to load bookings (HTTP ${response.status})`
             );
-
         }
 
 
@@ -425,7 +452,7 @@ async function loadBookings() {
 
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="9"
+                    <td colspan="10"
                         class="no-data">
 
                         No bookings found.
@@ -505,14 +532,13 @@ async function loadBookings() {
                         )}
                     </td>
 
-
                     <td>
-                        ${amount}
+                        ${escapeHtml(
+                            booking.event_time || "—"
+                        )}
                     </td>
 
-
                     <td>
-
                         <span
                             class="status-badge
                             ${getStatusClass(status)}">
@@ -522,6 +548,8 @@ async function loadBookings() {
                         </span>
 
                     </td>
+
+                    <td>${amount}</td>
 
 
                     <td>
@@ -548,7 +576,7 @@ async function loadBookings() {
 
                             <button
                                 class="action-btn view-btn"
-                                onclick="viewBooking('${booking._id}')"
+                                onclick="viewBooking(${Number(booking.booking_id)})"
                                 title="View Booking">
 
                                 👁
@@ -558,7 +586,7 @@ async function loadBookings() {
 
                             <button
                                 class="action-btn amount-btn"
-                                onclick="setAmount('${booking._id}')"
+                                onclick="setAmount(${Number(booking.booking_id)})"
                                 title="Set Amount">
 
                                 ₹
@@ -567,12 +595,12 @@ async function loadBookings() {
 
 
                             ${
-                                status !== "Confirmed"
+                                status === "Pending"
                                     ? `
                                     <button
                                         class="action-btn confirm-btn"
                                         onclick="updateBookingStatus(
-                                            '${booking._id}',
+                                            ${Number(booking.booking_id)},
                                             'Confirmed'
                                         )"
                                         title="Confirm">
@@ -586,12 +614,12 @@ async function loadBookings() {
 
 
                             ${
-                                status !== "Completed"
+                                status === "Confirmed"
                                     ? `
                                     <button
                                         class="action-btn complete-btn"
                                         onclick="updateBookingStatus(
-                                            '${booking._id}',
+                                            ${Number(booking.booking_id)},
                                             'Completed'
                                         )"
                                         title="Complete">
@@ -605,12 +633,12 @@ async function loadBookings() {
 
 
                             ${
-                                status !== "Cancelled"
+                                status === "Pending" || status === "Confirmed"
                                     ? `
                                     <button
                                         class="action-btn cancel-btn"
                                         onclick="updateBookingStatus(
-                                            '${booking._id}',
+                                            ${Number(booking.booking_id)},
                                             'Cancelled'
                                         )"
                                         title="Cancel">
@@ -653,7 +681,7 @@ async function loadBookings() {
 
             <tr>
 
-                <td colspan="9"
+                <td colspan="10"
                     class="error-message">
 
                     Unable to load bookings.
@@ -687,22 +715,17 @@ async function viewBooking(bookingId) {
     try {
 
         const response =
-            await fetch(
-                `${API_URL}/api/bookings`
+            await adminFetch(
+                `${API_URL}/api/bookings/${bookingId}`
             );
 
+        const data = await response.json();
 
-        const data =
-            await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || "Unable to load booking details.");
+        }
 
-
-        const booking =
-            (data.bookings || [])
-            .find(
-                item =>
-                    item._id === bookingId
-            );
-
+        const booking = data.booking;
 
         if (!booking) {
 
@@ -750,7 +773,6 @@ ${booking.message || "-"}
 
         `);
 
-
     } catch (error) {
 
         console.error(
@@ -759,7 +781,7 @@ ${booking.message || "-"}
         );
 
         alert(
-            "Unable to load booking details."
+            error.message || "Unable to load booking details."
         );
 
     }
@@ -791,7 +813,7 @@ async function updateBookingStatus(
     try {
 
         const response =
-            await fetch(
+            await adminFetch(
                 `${API_URL}/api/bookings/${bookingId}/status`,
                 {
                     method: "PATCH",
@@ -907,7 +929,7 @@ async function setAmount(bookingId) {
             `${API_URL}/api/bookings/${bookingId}/amount`
         );
 
-        const response = await fetch(
+        const response = await adminFetch(
             `${API_URL}/api/bookings/${bookingId}/amount`,
             {
                 method: "PATCH",
@@ -990,7 +1012,7 @@ async function loadFollowups() {
     try {
 
         const response =
-            await fetch(
+            await adminFetch(
                 `${API_URL}/api/followups`
             );
 
@@ -1074,6 +1096,7 @@ async function loadFollowups() {
 
                     <td>
                         ${escapeHtml(
+                            followup.remarks ||
                             followup.notes ||
                             followup.message ||
                             "-"
@@ -1126,7 +1149,7 @@ async function loadTransactions() {
     try {
 
         const response =
-            await fetch(
+            await adminFetch(
                 `${API_URL}/api/transactions`
             );
 
@@ -1161,7 +1184,7 @@ async function loadTransactions() {
 
             table.innerHTML = `
                 <tr>
-                    <td colspan="6">
+                    <td colspan="7">
                         No transactions found.
                     </td>
                 </tr>
@@ -1180,14 +1203,14 @@ async function loadTransactions() {
 
                 row.innerHTML = `
 
-                    <td>
-                        ${transaction.booking_id ?? "-"}
-                    </td>
+                    <td>${escapeHtml(transaction.customer_name || "-")}</td>
+                    <td>${transaction.booking_id ?? "—"}</td>
 
                     <td>
                         ${escapeHtml(
                             transaction.transaction_number ||
                             transaction.transaction_id ||
+                            transaction._id ||
                             "-"
                         )}
                     </td>
@@ -1236,7 +1259,7 @@ async function loadTransactions() {
 
         table.innerHTML = `
             <tr>
-                <td colspan="6">
+                <td colspan="7">
                     Unable to load transactions.
                 </td>
             </tr>
@@ -1263,7 +1286,7 @@ async function loadPayments() {
     try {
 
         const response =
-            await fetch(
+            await adminFetch(
                 `${API_URL}/api/payments`
             );
 
@@ -1300,7 +1323,7 @@ async function loadPayments() {
 
             table.innerHTML = `
                 <tr>
-                    <td colspan="5">
+                    <td colspan="6">
                         No payments found.
                     </td>
                 </tr>
@@ -1319,9 +1342,8 @@ async function loadPayments() {
 
                 row.innerHTML = `
 
-                    <td>
-                        ${payment.booking_id ?? "-"}
-                    </td>
+                    <td>${escapeHtml(payment.customer_name || "-")}</td>
+                    <td>${payment.booking_id ?? "—"}</td>
 
                     <td>
                         ₹${payment.amount ?? "-"}
@@ -1369,7 +1391,7 @@ async function loadPayments() {
 
         table.innerHTML = `
             <tr>
-                <td colspan="5">
+                <td colspan="6">
                     Unable to load payments.
                 </td>
             </tr>
@@ -1401,7 +1423,7 @@ async function loadSubscribers() {
     try {
 
         const response =
-            await fetch(
+            await adminFetch(
                 `${API_URL}/api/newsletter/subscribers`
             );
 
@@ -1651,6 +1673,9 @@ function getPaymentClass(
         case "UNPAID":
             return "payment-unpaid";
 
+        case "PARTIALLY_PAID":
+            return "payment-unpaid";
+
         case "NOT_DUE":
         default:
             return "payment-not-due";
@@ -1680,6 +1705,9 @@ function formatPaymentStatus(
 
         case "UNPAID":
             return "Unpaid";
+
+        case "PARTIALLY_PAID":
+            return "Partially Paid";
 
         case "NOT_DUE":
             return "Not Due";

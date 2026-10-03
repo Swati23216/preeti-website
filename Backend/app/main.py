@@ -1,7 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from pathlib import Path
 
 from .booking import Booking
 from .followup import FollowUp
@@ -32,6 +35,8 @@ load_dotenv()
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
 
 if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
@@ -54,6 +59,40 @@ app = FastAPI(
     version="1.0.0"
 )
 
+admin_security = HTTPBasic(auto_error=False)
+
+
+async def require_admin(
+    credentials: Optional[HTTPBasicCredentials] = Depends(admin_security)
+):
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Admin access is not configured. Set ADMIN_USERNAME and "
+                "ADMIN_PASSWORD in the backend environment, then restart it."
+            )
+        )
+
+    valid_username = credentials is not None and hmac.compare_digest(
+        credentials.username.encode("utf-8"),
+        ADMIN_USERNAME.encode("utf-8")
+    )
+    valid_password = credentials is not None and hmac.compare_digest(
+        credentials.password.encode("utf-8"),
+        ADMIN_PASSWORD.encode("utf-8")
+    )
+
+    if not valid_username or not valid_password:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid admin credentials",
+            headers={"WWW-Authenticate": "Basic"}
+        )
+
+
+FRONTEND_DIRECTORY = Path(__file__).resolve().parents[2]
+
 
 # ============================================================
 # CORS
@@ -74,11 +113,7 @@ app.add_middleware(
 
 @app.get("/")
 async def home():
-
-    return {
-        "status": "success",
-        "message": "Preeti's Website Backend is running!"
-    }
+    return FileResponse(FRONTEND_DIRECTORY / "index.html")
 
 
 # ============================================================
@@ -194,7 +229,7 @@ async def create_booking(booking: Booking):
 # GET ALL BOOKINGS
 # ============================================================
 
-@app.get("/api/bookings")
+@app.get("/api/bookings", dependencies=[Depends(require_admin)])
 async def get_all_bookings(
     status: Optional[str] = None
 ):
@@ -241,7 +276,7 @@ async def get_all_bookings(
     }
 
 
-@app.get("/api/bookings/summary")
+@app.get("/api/bookings/summary", dependencies=[Depends(require_admin)])
 async def booking_summary():
 
     total = await bookings_collection.count_documents({})
@@ -285,7 +320,7 @@ async def booking_summary():
 # GET BOOKING BY ID
 # ============================================================
 
-@app.get("/api/bookings/{booking_id}")
+@app.get("/api/bookings/{booking_id}", dependencies=[Depends(require_admin)])
 async def get_booking(
     booking_id: int
 ):
@@ -322,7 +357,10 @@ class BookingStatusUpdate(BaseModel):
     status: str
 
 
-@app.patch("/api/bookings/{booking_id}/status")
+@app.patch(
+    "/api/bookings/{booking_id}/status",
+    dependencies=[Depends(require_admin)]
+)
 async def update_booking_status(
     booking_id: int,
     data: BookingStatusUpdate
@@ -407,7 +445,10 @@ async def update_booking_status(
 # CHECK WHETHER PAYMENT IS AVAILABLE
 # ============================================================
 
-@app.get("/api/bookings/{booking_id}/payment-status")
+@app.get(
+    "/api/bookings/{booking_id}/payment-status",
+    dependencies=[Depends(require_admin)]
+)
 async def payment_status(
     booking_id: int
 ):
@@ -467,7 +508,7 @@ async def payment_status(
 # UPDATE BOOKING
 # ============================================================
 
-@app.put("/api/bookings/{booking_id}")
+@app.put("/api/bookings/{booking_id}", dependencies=[Depends(require_admin)])
 async def update_booking(
     booking_id: int,
     booking: Booking
@@ -521,7 +562,7 @@ async def update_booking(
 # DELETE BOOKING
 # ============================================================
 
-@app.delete("/api/bookings/{booking_id}")
+@app.delete("/api/bookings/{booking_id}", dependencies=[Depends(require_admin)])
 async def delete_booking(
     booking_id: int
 ):
@@ -553,7 +594,7 @@ async def delete_booking(
 # FOLLOW UPS
 # ============================================================
 
-@app.post("/api/followups")
+@app.post("/api/followups", dependencies=[Depends(require_admin)])
 async def create_followup(
     followup: FollowUp
 ):
@@ -612,7 +653,7 @@ async def create_followup(
     }
 
 
-@app.get("/api/followups")
+@app.get("/api/followups", dependencies=[Depends(require_admin)])
 async def get_all_followups(
     status: Optional[str] = None,
     booking_id: Optional[int] = None
@@ -666,7 +707,7 @@ async def get_all_followups(
     }
 
 
-@app.get("/api/followups/{followup_id}")
+@app.get("/api/followups/{followup_id}", dependencies=[Depends(require_admin)])
 async def get_followup(
     followup_id: int
 ):
@@ -696,7 +737,7 @@ async def get_followup(
     }
 
 
-@app.put("/api/followups/{followup_id}")
+@app.put("/api/followups/{followup_id}", dependencies=[Depends(require_admin)])
 async def update_followup(
     followup_id: int,
     followup: FollowUp
@@ -757,7 +798,7 @@ async def update_followup(
     }
 
 
-@app.delete("/api/followups/{followup_id}")
+@app.delete("/api/followups/{followup_id}", dependencies=[Depends(require_admin)])
 async def delete_followup(
     followup_id: int
 ):
@@ -790,7 +831,10 @@ class FollowUpStatusUpdate(BaseModel):
     status: str
 
 
-@app.patch("/api/followups/{followup_id}/status")
+@app.patch(
+    "/api/followups/{followup_id}/status",
+    dependencies=[Depends(require_admin)]
+)
 async def update_followup_status(
     followup_id: int,
     data: FollowUpStatusUpdate
@@ -851,7 +895,7 @@ async def update_followup_status(
 # TRANSACTIONS
 # ============================================================
 
-@app.post("/api/transactions")
+@app.post("/api/transactions", dependencies=[Depends(require_admin)])
 async def create_transaction(
     transaction: Transaction
 ):
@@ -934,7 +978,7 @@ async def create_transaction(
     }
 
 
-@app.get("/api/transactions")
+@app.get("/api/transactions", dependencies=[Depends(require_admin)])
 async def get_all_transactions(
     status: Optional[str] = None,
     booking_id: Optional[int] = None
@@ -981,6 +1025,11 @@ async def get_all_transactions(
 
 class PaymentCreate(BaseModel):
     booking_id: int
+    amount: Optional[float] = Field(
+        default=None,
+        gt=0,
+        allow_inf_nan=False
+    )
 
 
 class PaymentVerification(BaseModel):
@@ -988,6 +1037,17 @@ class PaymentVerification(BaseModel):
     razorpay_payment_id: str
     razorpay_signature: str
     booking_id: int
+
+
+class StandalonePaymentCreate(BaseModel):
+    customer_name: str = Field(min_length=2, max_length=100)
+    amount: float = Field(gt=0, allow_inf_nan=False)
+
+
+class StandalonePaymentVerification(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
 
 
 # ============================================================
@@ -1026,27 +1086,61 @@ async def create_payment_order(payment: PaymentCreate):
         )
 
     # --------------------------------------------------------
-    # Get service amount
+    # Determine the amount due, accounting for earlier payments.
     # --------------------------------------------------------
 
     service_amount = booking.get("service_amount")
+    paid_transactions = await transactions_collection.find(
+        {
+            "booking_id": payment.booking_id,
+            "status": "PAID"
+        }
+    ).to_list(length=None)
+    paid_amount = sum(
+        float(transaction.get("amount", 0) or 0)
+        for transaction in paid_transactions
+    )
 
-    if service_amount is None or service_amount <= 0:
+    if payment.amount is None and (
+        service_amount is None or service_amount <= 0
+    ):
 
         raise HTTPException(
             status_code=400,
-            detail="Service amount has not been set by admin"
+            detail="Enter the amount agreed with the makeup artist"
         )
 
-    # --------------------------------------------------------
-    # Check payment status
-    # --------------------------------------------------------
+    if service_amount is not None:
+        remaining_amount = max(
+            float(service_amount) - paid_amount,
+            0
+        )
+        if remaining_amount <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail="This booking has already been paid in full"
+            )
+        service_amount = remaining_amount
 
-    if booking.get("payment_status") == "PAID":
+    amount_to_charge = (
+        payment.amount
+        if payment.amount is not None
+        else service_amount
+    )
 
+    if amount_to_charge is None or amount_to_charge <= 0:
         raise HTTPException(
             status_code=400,
-            detail="This booking has already been paid"
+            detail="Payment amount must be greater than zero"
+        )
+
+    if service_amount is not None and amount_to_charge > service_amount:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Payment cannot exceed the remaining balance "
+                f"of ₹{service_amount:.2f}"
+            )
         )
 
     # --------------------------------------------------------
@@ -1054,8 +1148,14 @@ async def create_payment_order(payment: PaymentCreate):
     # --------------------------------------------------------
 
     amount_paise = int(
-        round(service_amount * 100)
+        round(amount_to_charge * 100)
     )
+
+    if amount_paise < 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Razorpay payments must be at least ₹1"
+        )
 
     try:
 
@@ -1082,7 +1182,7 @@ async def create_payment_order(payment: PaymentCreate):
                 payment.booking_id,
 
             "amount":
-                service_amount,
+                amount_paise / 100,
 
             "currency":
                 "INR",
@@ -1123,7 +1223,7 @@ async def create_payment_order(payment: PaymentCreate):
                 order["id"],
 
             "amount":
-                service_amount,
+                amount_paise / 100,
 
             "amount_paise":
                 amount_paise,
@@ -1147,6 +1247,142 @@ async def create_payment_order(payment: PaymentCreate):
             status_code=500,
             detail=f"Payment order creation failed: {str(e)}"
         )
+
+
+@app.post("/api/payments/create-standalone-order")
+async def create_standalone_payment_order(
+    payment: StandalonePaymentCreate
+):
+    customer_name = payment.customer_name.strip()
+    if len(customer_name) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter your name"
+        )
+
+    amount_paise = int(round(payment.amount * 100))
+    if amount_paise < 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Razorpay payments must be at least ₹1"
+        )
+
+    try:
+        order = razorpay_client.order.create(
+            {
+                "amount": amount_paise,
+                "currency": "INR",
+                "receipt": f"direct_{int(datetime.utcnow().timestamp())}",
+                "payment_capture": 1
+            }
+        )
+
+        result = await transactions_collection.insert_one(
+            {
+                "booking_id": None,
+                "customer_name": customer_name,
+                "payment_type": "STANDALONE",
+                "amount": amount_paise / 100,
+                "currency": "INR",
+                "status": "PENDING",
+                "gateway_order_id": order["id"],
+                "gateway_payment_id": None,
+                "payment_method": None,
+                "created_at": datetime.utcnow(),
+                "paid_at": None
+            }
+        )
+
+        return {
+            "status": "success",
+            "order_id": order["id"],
+            "amount": amount_paise / 100,
+            "amount_paise": amount_paise,
+            "currency": "INR",
+            "transaction_id": str(result.inserted_id),
+            "razorpay_key_id": RAZORPAY_KEY_ID,
+            "customer_name": customer_name
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Standalone payment order creation failed: {str(e)}"
+        )
+
+
+@app.post("/api/payments/verify-standalone")
+async def verify_standalone_payment(
+    payment: StandalonePaymentVerification
+):
+    transaction = await transactions_collection.find_one(
+        {
+            "gateway_order_id": payment.razorpay_order_id,
+            "payment_type": "STANDALONE"
+        }
+    )
+    if not transaction:
+        raise HTTPException(
+            status_code=404,
+            detail="Standalone payment transaction not found"
+        )
+
+    signature_payload = (
+        payment.razorpay_order_id
+        + "|"
+        + payment.razorpay_payment_id
+    )
+    generated_signature = hmac.new(
+        RAZORPAY_KEY_SECRET.encode("utf-8"),
+        signature_payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(
+        generated_signature,
+        payment.razorpay_signature
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid payment signature"
+        )
+
+    if transaction.get("status") == "PAID":
+        if transaction.get("gateway_payment_id") != payment.razorpay_payment_id:
+            raise HTTPException(
+                status_code=409,
+                detail="This order has already been verified with another payment"
+            )
+        return {
+            "status": "success",
+            "message": "Payment is already verified",
+            "payment_status": "PAID",
+            "customer_name": transaction.get("customer_name")
+        }
+
+    await transactions_collection.update_one(
+        {
+            "gateway_order_id": payment.razorpay_order_id,
+            "payment_type": "STANDALONE",
+            "status": "PENDING"
+        },
+        {
+            "$set": {
+                "status": "PAID",
+                "gateway_payment_id": payment.razorpay_payment_id,
+                "paid_at": datetime.utcnow()
+            }
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": "Payment verified successfully",
+        "payment_status": "PAID",
+        "customer_name": transaction.get("customer_name"),
+        "amount": transaction.get("amount"),
+        "razorpay_order_id": payment.razorpay_order_id,
+        "razorpay_payment_id": payment.razorpay_payment_id
+    }
 
 
 # ============================================================
@@ -1217,24 +1453,6 @@ async def verify_payment(
         )
 
     # --------------------------------------------------------
-    # Check if already paid
-    # --------------------------------------------------------
-
-    if booking.get("payment_status") == "PAID":
-
-        return {
-
-            "status":
-                "success",
-
-            "message":
-                "Payment is already verified",
-
-            "payment_status":
-                "PAID"
-        }
-
-    # --------------------------------------------------------
     # Generate expected Razorpay signature
     #
     # IMPORTANT:
@@ -1282,6 +1500,19 @@ async def verify_payment(
             detail="Invalid payment signature"
         )
 
+    if transaction.get("status") == "PAID":
+        if transaction.get("gateway_payment_id") != payment.razorpay_payment_id:
+            raise HTTPException(
+                status_code=409,
+                detail="This order has already been verified with another payment"
+            )
+        return {
+            "status": "success",
+            "message": "Payment is already verified",
+            "payment_status": booking.get("payment_status", "PAID"),
+            "booking_id": payment.booking_id
+        }
+
     # --------------------------------------------------------
     # Update transaction
     # --------------------------------------------------------
@@ -1309,8 +1540,26 @@ async def verify_payment(
     )
 
     # --------------------------------------------------------
-    # Update booking
+    # Recalculate paid total so partial payments remain visible.
     # --------------------------------------------------------
+
+    paid_transactions = await transactions_collection.find(
+        {
+            "booking_id": payment.booking_id,
+            "status": "PAID"
+        }
+    ).to_list(length=None)
+    paid_amount = sum(
+        float(item.get("amount", 0) or 0)
+        for item in paid_transactions
+    )
+    service_amount = booking.get("service_amount")
+    if service_amount is not None and paid_amount >= float(service_amount):
+        next_payment_status = "PAID"
+    elif paid_amount > 0:
+        next_payment_status = "PARTIALLY_PAID"
+    else:
+        next_payment_status = "UNPAID"
 
     await bookings_collection.update_one(
 
@@ -1323,7 +1572,10 @@ async def verify_payment(
             "$set": {
 
                 "payment_status":
-                    "PAID",
+                    next_payment_status,
+
+                "paid_amount":
+                    paid_amount,
 
                 "paid_at":
                     datetime.utcnow(),
@@ -1363,7 +1615,10 @@ async def verify_payment(
             "Payment verified successfully",
 
         "payment_status":
-            "PAID",
+            next_payment_status,
+
+        "paid_amount":
+            paid_amount,
 
         "booking_id":
             payment.booking_id,
@@ -1383,7 +1638,7 @@ async def verify_payment(
 # GET ALL PAYMENTS
 # ============================================================
 
-@app.get("/api/payments")
+@app.get("/api/payments", dependencies=[Depends(require_admin)])
 async def get_all_payments():
 
     transactions = await transactions_collection.find().sort(
@@ -1416,7 +1671,10 @@ async def get_all_payments():
 # GET PAYMENT BY BOOKING
 # ============================================================
 
-@app.get("/api/payments/booking/{booking_id}")
+@app.get(
+    "/api/payments/booking/{booking_id}",
+    dependencies=[Depends(require_admin)]
+)
 async def get_booking_payment(
     booking_id: int
 ):
@@ -1467,7 +1725,10 @@ class BookingAmountUpdate(BaseModel):
     amount: float
 
 
-@app.patch("/api/bookings/{booking_id}/amount")
+@app.patch(
+    "/api/bookings/{booking_id}/amount",
+    dependencies=[Depends(require_admin)]
+)
 async def update_booking_amount(
     booking_id: int,
     data: BookingAmountUpdate
@@ -1493,6 +1754,24 @@ async def update_booking_amount(
             detail="Booking not found"
         )
 
+    paid_transactions = await transactions_collection.find(
+        {
+            "booking_id": booking_id,
+            "status": "PAID"
+        }
+    ).to_list(length=None)
+    paid_amount = sum(
+        float(transaction.get("amount", 0) or 0)
+        for transaction in paid_transactions
+    )
+    payment_status = (
+        "PAID"
+        if paid_amount >= data.amount
+        else "PARTIALLY_PAID"
+        if paid_amount > 0
+        else "UNPAID"
+    )
+
     await bookings_collection.update_one(
 
         {
@@ -1507,7 +1786,10 @@ async def update_booking_amount(
                     data.amount,
 
                 "payment_status":
-                    "UNPAID"
+                    payment_status,
+
+                "paid_amount":
+                    paid_amount
             }
         }
     )
@@ -1565,7 +1847,10 @@ async def subscribe_newsletter(data: NewsletterSubscribe):
     }
 
 
-@app.get("/api/newsletter/subscribers")
+@app.get(
+    "/api/newsletter/subscribers",
+    dependencies=[Depends(require_admin)]
+)
 async def get_subscribers():
 
     subscribers = await newsletter_collection.find().sort(
@@ -1581,3 +1866,21 @@ async def get_subscribers():
     }
 
 
+@app.get("/admin.html", dependencies=[Depends(require_admin)])
+async def admin_page():
+    return FileResponse(FRONTEND_DIRECTORY / "admin.html")
+
+
+@app.get("/{asset_name}")
+async def frontend_asset(asset_name: str):
+    allowed_assets = {
+        "style.css",
+        "script.js",
+        "admin.css",
+        "admin.js",
+    }
+
+    if asset_name not in allowed_assets:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    return FileResponse(FRONTEND_DIRECTORY / asset_name)
