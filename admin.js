@@ -7,7 +7,7 @@ const API_URL =
     ["localhost", "127.0.0.1"].includes(window.location.hostname) &&
     window.location.port === "5500"
         ? "http://127.0.0.1:8000"
-        : window.location.origin;
+        : "https://preeti-website-1.onrender.com";
 
 let adminAuthorization = "";
 
