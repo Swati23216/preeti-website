@@ -1,10 +1,12 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from pathlib import Path
+from bson import ObjectId
 
 from .booking import Booking
 from .followup import FollowUp
@@ -15,6 +17,7 @@ from .database import (
     bookings_collection,
     followups_collection,
     transactions_collection,
+    upi_qr_sessions_collection,
     newsletter_collection 
 )
 
@@ -35,6 +38,7 @@ load_dotenv()
 
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
@@ -57,6 +61,12 @@ razorpay_client = razorpay.Client(
 app = FastAPI(
     title="Preeti's Makeup Website API",
     version="1.0.0"
+)
+
+app.mount(
+    "/Backend/app/images",
+    StaticFiles(directory=Path(__file__).resolve().parent / "images"),
+    name="website-images",
 )
 
 admin_security = HTTPBasic(auto_error=False)
@@ -1050,11 +1060,250 @@ class StandalonePaymentVerification(BaseModel):
     razorpay_signature: str
 
 
+class UpiPaymentReport(BaseModel):
+    customer_name: str = Field(min_length=2, max_length=100)
+    amount: float = Field(gt=0, allow_inf_nan=False)
+
+
+@app.get("/api/payments/upi-qr-image")
+async def get_upi_payment_qr_image():
+    image_path = Path(__file__).resolve().parent / "images" / "img7.png"
+    if not image_path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail="UPI payment QR image is missing"
+        )
+    return FileResponse(image_path, media_type="image/png")
+
+
+@app.post("/api/payments/upi-report")
+async def create_upi_payment_report(report: UpiPaymentReport):
+    customer_name = report.customer_name.strip()
+    amount_paise = round(report.amount * 100)
+    if len(customer_name) < 2 or amount_paise < 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter your name and a payment amount of at least ₹1"
+        )
+
+    transaction = {
+        "customer_name": customer_name,
+        "booking_id": None,
+        "payment_type": "UPI_MANUAL",
+        "payment_method": "UPI",
+        "amount": amount_paise / 100,
+        "currency": "INR",
+        "status": "PENDING",
+        "gateway_payment_id": None,
+        "gateway_order_id": None,
+        "created_at": datetime.utcnow(),
+        "paid_at": None
+    }
+    result = await transactions_collection.insert_one(transaction)
+    return {
+        "status": "success",
+        "message": "Payment report saved for manual verification",
+        "transaction_id": str(result.inserted_id),
+        "payment_status": "PENDING"
+    }
+
+
+@app.post("/api/payments/upi-qr")
+async def create_upi_qr():
+    try:
+        qr_code = razorpay_client.qrcode.create(
+            {
+                "type": "upi_qr",
+                "usage": "multiple_use",
+                "fixed_amount": False,
+                "name": "Preeti Makeup Payment",
+                "description": "UPI payment to Preeti's Makeup",
+                "notes": {
+                    "source": "preeti_website"
+                }
+            }
+        )
+
+        await upi_qr_sessions_collection.insert_one(
+            {
+                "_id": qr_code["id"],
+                "image_url": qr_code["image_url"],
+                "status": "ACTIVE",
+                "created_at": datetime.utcnow()
+            }
+        )
+
+        return {
+            "status": "success",
+            "qr_code_id": qr_code["id"],
+            "image_url": qr_code["image_url"]
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Unable to create a UPI QR code. Confirm UPI QR codes are "
+                f"enabled for this Razorpay account. Provider error: {exc}"
+            )
+        ) from exc
+
+
+@app.get("/api/payments/upi-qr/{qr_code_id}")
+async def get_upi_qr_status(qr_code_id: str):
+    session = await upi_qr_sessions_collection.find_one(
+        {"_id": qr_code_id}
+    )
+    if not session:
+        raise HTTPException(
+            status_code=404,
+            detail="UPI QR payment session not found"
+        )
+
+    payments = await transactions_collection.find(
+        {
+            "gateway_qr_code_id": qr_code_id,
+            "status": "PAID"
+        }
+    ).to_list(length=None)
+    total_amount = sum(
+        float(payment.get("amount", 0) or 0)
+        for payment in payments
+    )
+
+    return {
+        "status": "PAID" if payments else "PENDING",
+        "amount_received": total_amount,
+        "payments_count": len(payments)
+    }
+
+
+@app.post("/api/webhooks/razorpay")
+async def handle_razorpay_webhook(
+    request: Request,
+    x_razorpay_signature: Optional[str] = Header(default=None)
+):
+    if not RAZORPAY_WEBHOOK_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="Razorpay webhook secret is not configured"
+        )
+    if not x_razorpay_signature:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing Razorpay webhook signature"
+        )
+
+    payload_bytes = await request.body()
+    expected_signature = hmac.new(
+        RAZORPAY_WEBHOOK_SECRET.encode("utf-8"),
+        payload_bytes,
+        hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(
+        expected_signature,
+        x_razorpay_signature
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Razorpay webhook signature"
+        )
+
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Razorpay webhook payload"
+        ) from exc
+
+    if payload.get("event") != "qr_code.credited":
+        return {"status": "ignored"}
+
+    payment = (
+        payload.get("payload", {})
+        .get("payment", {})
+        .get("entity", {})
+    )
+    qr_code = (
+        payload.get("payload", {})
+        .get("qr_code", {})
+        .get("entity", {})
+    )
+    payment_id = payment.get("id")
+    qr_code_id = qr_code.get("id")
+    if (
+        not payment_id
+        or not qr_code_id
+        or payment.get("status") != "captured"
+        or payment.get("method") != "upi"
+    ):
+        return {"status": "ignored"}
+
+    session = await upi_qr_sessions_collection.find_one(
+        {"_id": qr_code_id}
+    )
+    if not session:
+        return {"status": "ignored"}
+
+    payment_amount = payment.get("amount")
+    if not isinstance(payment_amount, int) or payment_amount < 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Razorpay sent an invalid UPI payment amount"
+        )
+
+    paid_at = datetime.utcnow()
+    if payment.get("created_at"):
+        paid_at = datetime.utcfromtimestamp(payment["created_at"])
+
+    await transactions_collection.update_one(
+        {"_id": payment_id},
+        {
+            "$setOnInsert": {
+                "customer_name": (
+                    payment.get("contact")
+                    or payment.get("email")
+                    or payment.get("vpa")
+                    or "UPI payer"
+                ),
+                "payer_vpa": payment.get("vpa"),
+                "payer_email": payment.get("email"),
+                "payer_contact": payment.get("contact"),
+                "booking_id": None,
+                "payment_type": "UPI_QR",
+                "amount": payment_amount / 100,
+                "currency": payment.get("currency", "INR"),
+                "status": "PAID",
+                "payment_method": "UPI",
+                "gateway_qr_code_id": qr_code_id,
+                "gateway_payment_id": payment_id,
+                "gateway_order_id": payment.get("order_id"),
+                "created_at": paid_at,
+                "paid_at": paid_at
+            }
+        },
+        upsert=True
+    )
+
+    try:
+        razorpay_client.qrcode.close(qr_code_id)
+        await upi_qr_sessions_collection.update_one(
+            {"_id": qr_code_id},
+            {"$set": {"status": "PAID"}}
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Unable to close the paid UPI QR code: {exc}"
+        ) from exc
+
+    return {"status": "success"}
+
+
 # ============================================================
 # CREATE RAZORPAY ORDER
 # ============================================================
 
-@app.post("/api/payments/create-order")
 async def create_payment_order(payment: PaymentCreate):
 
     # --------------------------------------------------------
@@ -1249,7 +1498,6 @@ async def create_payment_order(payment: PaymentCreate):
         )
 
 
-@app.post("/api/payments/create-standalone-order")
 async def create_standalone_payment_order(
     payment: StandalonePaymentCreate
 ):
@@ -1664,6 +1912,44 @@ async def get_all_payments():
 
         "transactions":
             transactions
+    }
+
+
+@app.post(
+    "/api/payments/{payment_id}/confirm",
+    dependencies=[Depends(require_admin)]
+)
+async def confirm_upi_payment(payment_id: str):
+    if not ObjectId.is_valid(payment_id):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid payment report ID"
+        )
+
+    result = await transactions_collection.update_one(
+        {
+            "_id": ObjectId(payment_id),
+            "payment_type": "UPI_MANUAL",
+            "status": "PENDING"
+        },
+        {
+            "$set": {
+                "status": "PAID",
+                "paid_at": datetime.utcnow(),
+                "manually_verified": True
+            }
+        }
+    )
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=409,
+            detail="Payment report is not pending or does not exist"
+        )
+
+    return {
+        "status": "success",
+        "payment_status": "PAID",
+        "message": "UPI payment marked verified"
     }
 
 

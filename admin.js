@@ -1323,7 +1323,7 @@ async function loadPayments() {
 
             table.innerHTML = `
                 <tr>
-                    <td colspan="6">
+                    <td colspan="7">
                         No payments found.
                     </td>
                 </tr>
@@ -1342,7 +1342,11 @@ async function loadPayments() {
 
                 row.innerHTML = `
 
-                    <td>${escapeHtml(payment.customer_name || "-")}</td>
+                    <td>${escapeHtml(
+                        payment.payer_vpa ||
+                        payment.customer_name ||
+                        "-"
+                    )}</td>
                     <td>${payment.booking_id ?? "—"}</td>
 
                     <td>
@@ -1366,10 +1370,22 @@ async function loadPayments() {
 
                     <td>
                         ${escapeHtml(
+                            payment.gateway_qr_code_id ||
                             payment.gateway_order_id ||
                             payment.order_id ||
                             "-"
                         )}
+                    </td>
+
+                    <td>
+                        ${
+                            payment.payment_type === "UPI_MANUAL" &&
+                            payment.status === "PENDING"
+                                ? `<button type="button" class="action-btn" data-confirm-upi-payment="${escapeHtml(payment._id)}">Mark verified</button>`
+                                : payment.manually_verified
+                                    ? "Manually verified"
+                                    : "—"
+                        }
                     </td>
 
                 `;
@@ -1391,7 +1407,7 @@ async function loadPayments() {
 
         table.innerHTML = `
             <tr>
-                <td colspan="6">
+                <td colspan="7">
                     Unable to load payments.
                 </td>
             </tr>
@@ -1399,6 +1415,29 @@ async function loadPayments() {
 
     }
 
+}
+
+async function confirmUpiPayment(paymentId) {
+    if (!window.confirm("Confirm that you checked this payment in PhonePe and it was received?")) {
+        return;
+    }
+
+    try {
+        const response = await adminFetch(
+            `${API_URL}/api/payments/${encodeURIComponent(paymentId)}/confirm`,
+            { method: "POST" }
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Unable to verify payment");
+        }
+
+        await loadPayments();
+    } catch (error) {
+        console.error("UPI payment verification failed:", error);
+        window.alert(error.message);
+    }
 }
 
 
@@ -1786,3 +1825,12 @@ document.addEventListener(
 
     }
 );
+
+document
+    .getElementById("paymentsTable")
+    ?.addEventListener("click", event => {
+        const button = event.target.closest("[data-confirm-upi-payment]");
+        if (button) {
+            confirmUpiPayment(button.dataset.confirmUpiPayment);
+        }
+    });

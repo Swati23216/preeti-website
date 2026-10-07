@@ -31,4 +31,6 @@ followups_collection = database["followups"]
 
 transactions_collection = database["transactions"]
 
+upi_qr_sessions_collection = database["upi_qr_sessions"]
+
 newsletter_collection = database["newsletter_subscribers"]

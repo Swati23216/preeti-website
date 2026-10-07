@@ -72,11 +72,9 @@ The project is deployed using a production architecture with:
 
 ### 💳 Payment Management
 
-- Razorpay payment gateway integration
-- Payment tracking
-- Transaction management
-- Booking payment status updates
-- Admin-side payment workflow
+- Customers scan the provided PhonePe UPI QR and choose the amount in their UPI app
+- Payment reports are saved as pending for manual verification
+- Admin can mark a report verified after checking PhonePe
 
 ---
 
@@ -97,16 +95,14 @@ Admin Confirms Booking
         ↓
 Service Completion
         ↓
-Customer payment by booking reference or agreed direct payment
+Customer scans the PhonePe UPI QR and enters an amount in their UPI app
         ↓
-Razorpay payment verification
+Customer submits their name and amount for verification
         ↓
-Payment / transaction tracking
+Pending payment report is saved for Preeti to verify in PhonePe
 ```
 
-After an admin marks the service completed, the customer can pay using their booking reference and enter the amount agreed with the makeup artist. If the admin has set a final booking amount, the backend prevents payment above the remaining balance. Successful payments are recorded against the booking; partial payments are tracked and the booking is only marked fully paid once its configured total has been covered.
-
-If the customer does not have a booking reference and Preeti has agreed to accept a direct payment, they can use the separate name-and-amount Razorpay option. This creates a standalone transaction (not attached to a booking); once Razorpay verification succeeds, the customer's name, amount, and paid status appear in the admin Payments and Transactions lists.
+PhonePe QR payments are direct UPI transfers and are not automatically confirmed by Razorpay. Customers can submit their name and amount after paying; the report is saved as `PENDING` in the admin Payments and Transactions lists. Preeti should check PhonePe before marking a report verified in the admin dashboard.
 
 ---
 
@@ -196,6 +192,7 @@ ADMIN_PASSWORD=choose_a_long_unique_password
 ```
 
 Set the same environment variables in the Render Web Service settings. Do not commit credentials to the repository. After deployment, the customer site is served at `/` and the password-protected admin dashboard is at `/admin.html`. Admin API requests require the same HTTP Basic username and password.
+
 
 ### 4. Start API
 
